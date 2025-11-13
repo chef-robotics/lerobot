@@ -164,6 +164,7 @@ def save_checkpoint_manifest(
     train_loss: float,
     eval_loss: float | None,
     checkpoint_dir: str,
+    checkpoint_reason: str,
 ) -> None:
     """Save checkpoint information to manifest.jsonl file."""
     manifest_path = output_dir / "manifest.jsonl"
@@ -173,6 +174,7 @@ def save_checkpoint_manifest(
         "train_loss": train_loss,
         "eval_loss": eval_loss,
         "checkpoint_dir": checkpoint_dir,
+        "checkpoint_reason": checkpoint_reason,
     }
     
     # Append to manifest file
@@ -327,6 +329,9 @@ def train(cfg: TrainPipelineConfig):
     logging.info(f"{num_learnable_params=} ({format_big_number(num_learnable_params)})")
     logging.info(f"{num_total_params=} ({format_big_number(num_total_params)})")
 
+    # Track best eval loss for saving best checkpoints
+    best_eval_loss = float('inf')
+
     # create dataloader for offline training
     if hasattr(cfg.policy, "drop_n_last_frames"):
         shuffle = False
@@ -466,8 +471,21 @@ def train(cfg: TrainPipelineConfig):
                     }
                     wandb_logger.log_dict(dataset_eval_dict, step, mode="eval")
 
-        if cfg.save_checkpoint and is_saving_step:
-            logging.info(f"Checkpoint policy after step {step}")
+        # Checkpointing logic - save checkpoint if scheduled OR if eval loss improved
+        should_save_checkpoint = False
+        checkpoint_reason = ""
+        
+        if cfg.save_checkpoint:
+            if is_saving_step:
+                should_save_checkpoint = True
+                checkpoint_reason = "scheduled"
+            elif current_eval_loss is not None and current_eval_loss < best_eval_loss:
+                should_save_checkpoint = True
+                checkpoint_reason = "best_eval_loss"
+                best_eval_loss = current_eval_loss
+                
+        if should_save_checkpoint:
+            logging.info(f"Checkpoint policy after step {step} ({checkpoint_reason})")
             checkpoint_dir = get_step_checkpoint_dir(cfg.output_dir, cfg.steps, step)
             save_checkpoint(checkpoint_dir, step, cfg, policy, optimizer, lr_scheduler)
             update_last_checkpoint(checkpoint_dir)
@@ -481,6 +499,7 @@ def train(cfg: TrainPipelineConfig):
                 current_train_loss,
                 current_eval_loss,
                 checkpoint_dir.name,
+                checkpoint_reason,
             )
 
     if eval_env:

@@ -255,8 +255,11 @@ def train(cfg: TrainPipelineConfig):
     # Try to load splits.yaml to split dataset into train/eval
     dataset_root = Path(cfg.dataset.root) if cfg.dataset.root else None
     splits = None
+    splits_file_path = None
     if dataset_root and dataset_root.exists():
         splits = load_splits_yaml(dataset_root)
+        if splits is not None:
+            splits_file_path = dataset_root / "splits.yaml"
     
     train_dataset = None
     eval_dataset = None
@@ -275,6 +278,12 @@ def train(cfg: TrainPipelineConfig):
         if cfg.eval_freq > 0:
             eval_dataset = make_lerobot_dataset_with_episodes(cfg, eval_episodes)
             logging.info(f"Eval set (num_episodes={eval_dataset.num_episodes}, num_frames={eval_dataset.num_frames}): {eval_episodes}")
+        
+        # Save a copy of splits.yaml to the output directory for reproducibility
+        if splits_file_path and splits_file_path.exists():
+            output_splits_path = cfg.output_dir / "splits.yaml"
+            output_splits_path.write_text(splits_file_path.read_text())
+            logging.info(f"Saved splits.yaml to {output_splits_path}")
         
         # Use train_dataset as the main dataset for compatibility
         dataset = train_dataset

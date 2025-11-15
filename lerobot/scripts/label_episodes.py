@@ -4,14 +4,22 @@ Script to label episodes in a LeRobot dataset with custom metadata.
 
 Usage:
     python label_episodes.py --repo-id <repo_id> --root <dataset_root> \
-        --camera <camera_key> --metadata-keys key1 key2 key3
+        --camera <camera_key> --metadata-keys key1 key2 key3 \
+        [--video-backend pyav|torchcodec] [--skip-labeled]
 
 Example:
-    python label_episodes.py \
-        --repo-id TrossenRoboticsCommunity/trossen_ai_stationary_handover_cube \
-        --root sandi/datasets/TrossenRoboticsCommunity/trossen_ai_stationary_handover_cube \
-        --camera observation.images.top \
-        --metadata-keys right_arm_helping cube_color grasp_quality
+    python third_party/lerobot/lerobot/scripts/label_episodes.py \
+        --repo-id chef_robotcs/lettuce_sandwich \
+        --root /Users/sherrychen/Documents/chef_dev/ChefResearch/sandi/datasets/chef_robotics/lettuce-sandwich \
+        --camera observation.images.cam_high \
+        --metadata-keys right_arm_helping \
+        --video-backend pyav \
+        --skip-labeled
+
+Notes:
+    - On macOS, pyav (default) is typically faster than torchcodec for video decoding.
+    - Use --skip-labeled to automatically skip episodes that are already fully labeled (no prompts shown).
+
 """
 
 import argparse
@@ -39,12 +47,14 @@ class EpisodeLabeler:
         metadata_keys: list[str],
         metadata_file: Path,
         start_episode: int = 0,
+        skip_labeled: bool = False,
     ):
         self.dataset = dataset
         self.camera_key = camera_key
         self.metadata_keys = metadata_keys
         self.metadata_file = metadata_file
         self.start_episode = start_episode
+        self.skip_labeled = skip_labeled
         
         # Load existing metadata if it exists
         self.existing_metadata = self._load_existing_metadata()
@@ -85,37 +95,31 @@ class EpisodeLabeler:
                 writer.write(self.existing_metadata[ep_idx])
     
     def _get_episode_frames(self, episode_index: int) -> np.ndarray:
-        """Get all frames from an episode for a specific camera."""
-        # Get frame indices for this episode
-        ep_start = self.dataset.episode_data_index["from"][episode_index]
-        ep_end = self.dataset.episode_data_index["to"][episode_index]
+        """Get all frames from an episode for a specific camera by loading video file directly."""
+        # Get the video file path directly
+        video_path = Path(self.dataset.root) / self.dataset.meta.get_video_file_path(episode_index, self.camera_key)
         
+        if not video_path.exists():
+            raise FileNotFoundError(f"Video file not found: {video_path}")
+        
+        # Open video file with cv2
+        cap = cv2.VideoCapture(str(video_path))
+        
+        if not cap.isOpened():
+            raise RuntimeError(f"Failed to open video file: {video_path}")
+        
+        # Read all frames
         frames = []
-        for idx in range(ep_start.item(), ep_end.item()):
-            item = self.dataset[idx]
-            frame = item[self.camera_key]
-            
-            # Convert to numpy and ensure it's in the right format for OpenCV (H, W, C)
-            if isinstance(frame, torch.Tensor):
-                frame = frame.numpy()
-            
-            # Handle different frame shapes
-            if frame.ndim == 3:
-                if frame.shape[0] in [1, 3]:  # (C, H, W)
-                    frame = np.transpose(frame, (1, 2, 0))
-            
-            # Convert to uint8 if needed
-            if frame.dtype != np.uint8:
-                if frame.max() <= 1.0:
-                    frame = (frame * 255).astype(np.uint8)
-                else:
-                    frame = frame.astype(np.uint8)
-            
-            # Convert RGB to BGR for OpenCV
-            if frame.shape[-1] == 3:
-                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-            
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
             frames.append(frame)
+        
+        cap.release()
+        
+        if len(frames) == 0:
+            raise RuntimeError(f"No frames found in video: {video_path}")
         
         return np.array(frames)
     
@@ -212,15 +216,32 @@ class EpisodeLabeler:
         
         return metadata
     
-    def label_episode(self, episode_index: int) -> bool:
-        """Label a single episode. Returns True if labeled, False if skipped."""
+    def label_episode(self, episode_index: int) -> tuple[bool, str]:
+        """Label a single episode. Returns (labeled, reason) tuple.
+        
+        Reasons: 'all_keys_present', 'user_skip', 'incomplete_skip', 'no_metadata', 'labeled'
+        """
         print("\n" + "=" * 80)
         print(f"Episode {episode_index} / {self.dataset.num_episodes - 1}")
         
         # Check if episode already has metadata
         if episode_index in self.existing_metadata:
-            print(f"\nExisting metadata found:")
             existing = self.existing_metadata[episode_index]
+            
+            # Check if all required metadata keys are present and non-empty
+            all_keys_present = all(
+                key in existing and existing[key] is not None and existing[key] != ""
+                for key in self.metadata_keys
+            )
+            
+            if all_keys_present:
+                print(f"\n✓ Episode already has all required metadata, skipping:")
+                for key in self.metadata_keys:
+                    print(f"  {key}: {existing[key]}")
+                return (False, "all_keys_present")
+            
+            # Some keys are missing, show what exists and ask to overwrite
+            print(f"\nExisting metadata found (incomplete):")
             for key, value in existing.items():
                 if key != "episode_index":
                     print(f"  {key}: {value}")
@@ -228,10 +249,10 @@ class EpisodeLabeler:
             response = input("\nOverwrite existing metadata? (y/n/skip): ").strip().lower()
             if response == 'skip' or response == 's':
                 print("Skipping episode")
-                return False
+                return (False, "user_skip")
             elif response != 'y' and response != 'yes':
                 print("Keeping existing metadata, moving to next episode")
-                return False
+                return (False, "incomplete_skip")
         
         # Get episode info
         episode_info = self.dataset.meta.episodes[episode_index]
@@ -247,21 +268,17 @@ class EpisodeLabeler:
         
         if not metadata:
             print("No metadata entered, skipping episode")
-            return False
+            return (False, "no_metadata")
         
         # Confirm and save
         print("\nMetadata to save:")
         for key, value in metadata.items():
             print(f"  {key}: {value} (type: {type(value).__name__})")
         
-        response = input("\nSave this metadata? (y/n): ").strip().lower()
-        if response == 'y' or response == 'yes':
-            self._save_metadata(episode_index, metadata)
-            print(f"✓ Metadata saved for episode {episode_index}")
-            return True
-        else:
-            print("Metadata discarded")
-            return False
+        self._save_metadata(episode_index, metadata)
+        print(f"✓ Metadata saved for episode {episode_index}")
+        return (True, "labeled")
+
     
     def run(self) -> None:
         """Run the labeling process for all episodes."""
@@ -273,21 +290,50 @@ class EpisodeLabeler:
         print(f"Camera: {self.camera_key}")
         print(f"Metadata keys: {', '.join(self.metadata_keys)}")
         print(f"Output file: {self.metadata_file}")
+        if self.skip_labeled:
+            print(f"Mode: Auto-skip already labeled episodes")
         print("=" * 80)
         
-        episodes_to_label = range(self.start_episode, self.dataset.num_episodes)
+        episode_index = self.start_episode
         labeled_count = 0
         
-        for episode_index in episodes_to_label:
-            if self.label_episode(episode_index):
+        while episode_index < self.dataset.num_episodes:
+            labeled, reason = self.label_episode(episode_index)
+            if labeled:
                 labeled_count += 1
             
-            # Ask if user wants to continue
+            # If skip_labeled is on and episode was already labeled, skip to next automatically
+            if self.skip_labeled and reason == "all_keys_present":
+                episode_index += 1
+                continue
+            
+            # Ask what to do next
             if episode_index < self.dataset.num_episodes - 1:
-                response = input("\nContinue to next episode? (y/n/q to quit): ").strip().lower()
-                if response == 'q' or response == 'quit' or response == 'n' or response == 'no':
+                print("\nOptions:")
+                print("  [y/n] Continue to next episode")
+                print("  [p]   Go back and relabel previous episode")
+                print("  [q]   Quit")
+                response = input("Choice: ").strip().lower()
+                
+                if response == 'q' or response == 'quit':
                     print(f"\nStopping. Labeled {labeled_count} episodes.")
                     break
+                elif response == 'p' or response == 'prev' or response == 'previous':
+                    if episode_index > 0:
+                        episode_index -= 1
+                        print(f"\n⮐ Going back to episode {episode_index}")
+                        continue
+                    else:
+                        print("\nAlready at the first episode, cannot go back.")
+                        continue
+                elif response == 'n' or response == 'no':
+                    print(f"\nStopping. Labeled {labeled_count} episodes.")
+                    break
+                # Default: continue to next (y or Enter)
+                episode_index += 1
+            else:
+                # Last episode
+                episode_index += 1
         
         print("\n" + "=" * 80)
         print(f"Labeling complete! Labeled {labeled_count} episodes.")
@@ -334,11 +380,23 @@ def main():
         help="Episode index to start from (default: 0)"
     )
     parser.add_argument(
+        "--skip-labeled",
+        action="store_true",
+        help="Automatically skip episodes that already have all required metadata keys (no prompts)"
+    )
+    parser.add_argument(
         "--episodes",
         nargs="+",
         type=int,
         default=None,
         help="Specific episode indices to label (optional)"
+    )
+    parser.add_argument(
+        "--video-backend",
+        type=str,
+        default="pyav",
+        choices=["pyav", "torchcodec"],
+        help="Video backend to use for decoding (default: pyav, which is faster on macOS)"
     )
     
     args = parser.parse_args()
@@ -349,6 +407,7 @@ def main():
         repo_id=args.repo_id,
         root=args.root,
         download_videos=True,
+        video_backend=args.video_backend,
     )
     
     # Set output file
@@ -364,6 +423,7 @@ def main():
         metadata_keys=args.metadata_keys,
         metadata_file=metadata_file,
         start_episode=args.start_episode,
+        skip_labeled=args.skip_labeled,
     )
     
     # Run labeling

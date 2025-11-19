@@ -92,26 +92,6 @@ def inspect_dataset(repo_id: str, root: str):
     else:
         print("✗ No episodes_metadata.jsonl found")
         print(f"  Run label_episodes.py to create it")
-    
-    print("\n" + "=" * 80)
-    print("USAGE EXAMPLES")
-    print("=" * 80)
-    print("\n1. Label episodes:")
-    if dataset.meta.camera_keys:
-        camera = dataset.meta.camera_keys[0]
-        print(f"   python label_episodes.py \\")
-        print(f"       --repo-id {repo_id} \\")
-        print(f"       --root {root} \\")
-        print(f"       --camera {camera} \\")
-        print(f"       --metadata-keys key1 key2 key3")
-    
-    if metadata_file.exists():
-        print("\n2. Query metadata:")
-        print(f"   python query_episode_metadata.py \\")
-        print(f"       --metadata-file {metadata_file} \\")
-        print(f"       --stats")
-    
-    print("\n" + "=" * 80)
 
 
 def main():

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Script to label episodes in a LeRobot dataset with custom metadata.
+Script to label episodes in a LeRobot dataset with custom metadata labels (k-v pairs).
 
 Usage:
     python label_episodes.py --repo-id <repo_id> --root <dataset_root> \

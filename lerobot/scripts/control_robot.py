@@ -395,7 +395,6 @@ def replay(
 def control_robot(cfg: ControlPipelineConfig):
     init_logging()
     logging.info(pformat(asdict(cfg)))
-
     robot = make_robot_from_config(cfg.robot)
 
     if isinstance(cfg.control, CalibrateControlConfig):
@@ -418,4 +417,7 @@ def control_robot(cfg: ControlPipelineConfig):
 
 
 if __name__ == "__main__":
+    print("="*40)
+    print("info: control_robot.py")
+    print("="*40)
     control_robot()

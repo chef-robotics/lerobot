@@ -632,7 +632,7 @@ class TrossenAIStationaryRobotConfig(ManipulatorRobotConfig):
     # Gain applied to external efforts sensed on the follower arm and transmitted to the leader arm.
     # This enables the user to feel external forces (e.g., contact with objects) through force feedback.
     # A value of 0.0 disables force feedback. A good starting value for a responsive experience is 0.1.
-    force_feedback_gain: float = 0.0
+    force_feedback_gain: float = 0.15
 
     # Multiplier for computing minimum time (in seconds) for the arm to reach a target position.
     # The final goal time is computed as: min_time_to_move = multiplier / fps.

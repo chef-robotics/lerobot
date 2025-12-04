@@ -222,6 +222,9 @@ def control_loop(
     fps: int | None = None,
     single_task: str | None = None,
 ):
+    print("="*40)
+    print("control_loop")
+    print("="*40)
     # TODO(rcadene): Add option to record logs
     if not robot.is_connected:
         robot.connect()

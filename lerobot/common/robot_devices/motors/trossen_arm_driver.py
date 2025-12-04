@@ -123,13 +123,44 @@ class TrossenArmDriver:
             traceback.print_exc()
             print(f"Failed to configure the driver for the {self.model} arm at {self.ip}.")
             raise
-
+        
+        self.is_connected = True
+        # self.adjust_end_effector_friction(9.5)
+        self.set_all_friction_constants(
+            [
+                0.314,
+                0.07,
+                0.1599, 
+                -0.019999999552965164, 
+                0.029999999329447746, 
+                -0.019999999552965164, 
+                10.5,
+            ] #joint 0 to joint 6
+        )
+        '''
+        default values:
+        --- Joint  0  ---
+        Before:  0.3140000104904175
+        --- Joint  1  ---
+        Before:  0.07000000029802322
+        --- Joint  2  ---
+        Before:  0.1599999964237213
+        --- Joint  3  ---
+        Before:  -0.019999999552965164
+        --- Joint  4  ---
+        Before:  0.029999999329447746
+        --- Joint  5  ---
+        Before:  -0.019999999552965164
+        --- Joint  6  ---
+        Before:  9.5
+        '''
+        
         # Move the arms to the home pose
         self.driver.set_all_modes(trossen.Mode.position)
         self.driver.set_all_positions(self.home_pose, 2.0, False)
-
+        
         # Allow to read and write
-        self.is_connected = True
+        # self.is_connected = True
 
     def reconnect(self):
         try:
@@ -246,3 +277,36 @@ class TrossenArmDriver:
     def __del__(self):
         if getattr(self, "is_connected", False):
             self.disconnect()
+
+    def set_all_friction_constants(self, values: list[float]):
+        """
+        Set friction_constant_term for ALL 7 joints.
+        `values` must be a list of 7 floats, one per joint.
+        Example: [11.42, 9.8, 10.1, 8.7, 7.5, 12.3, 15.0]
+        referenced from /home/trossen/trossen_arm/demos/python/joint_characteristics_finetune.py
+        """
+        if not self.is_connected:
+            raise RobotDeviceNotConnectedError(
+                f"TrossenArmDriver({self.ip}) is not connected. You need to run `motors_bus.connect()`."
+            )
+        if len(values) != 7:
+            raise ValueError("values must contain 7 elements (one per joint).")
+        num_joints = self.driver.get_num_joints()
+        # external effort mode
+        modes = [trossen.Mode.external_effort] * num_joints
+        self.driver.set_joint_modes(modes)
+        for idx in range(num_joints):
+            self.driver.set_joint_external_effort(idx, 0.0, False)
+        joint_chars = self.driver.get_joint_characteristics()
+        # print(f"joint_chars = {joint_chars}")
+        
+        #get
+        for idx in range(num_joints):
+            print("--- Joint ", idx, " ---")
+            print("Before: ", joint_chars[idx].friction_constant_term)
+            joint_chars[idx].friction_constant_term = values[idx]
+            print("After:  ", joint_chars[idx].friction_constant_term)
+        #update
+        self.driver.set_joint_characteristics(joint_chars)
+    
+

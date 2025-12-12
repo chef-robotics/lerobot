@@ -169,7 +169,6 @@ class ManipulatorRobot:
         self.gripper_idxs: dict[str, int] = {}
         for name, bus in self.follower_arms.items():
             names = list(bus.motor_names)
-            print("follower_arms motor names:", names) #for tuning
             if "joint_6" in names:
                 self.gripper_idxs[name] = names.index("joint_6")
                 

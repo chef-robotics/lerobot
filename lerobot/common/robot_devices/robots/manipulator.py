@@ -325,7 +325,6 @@ class ManipulatorRobot:
         def load_or_run_calibration_(name, arm, arm_type):
             arm_id = get_arm_id(name, arm_type)
             arm_calib_path = self.calibration_dir / f"{arm_id}.json"
-            print(f"arm_calib_path = {arm_calib_path}")
             if arm_calib_path.exists():
                 with open(arm_calib_path) as f:
                     calibration = json.load(f)

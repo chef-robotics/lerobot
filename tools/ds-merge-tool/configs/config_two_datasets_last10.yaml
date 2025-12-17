@@ -1,0 +1,14 @@
+# ===========================================
+# KEEP ONLY LAST 10 EPISODES OF FIRST DATASET
+# ===========================================
+# Useful when earlier episodes are shorter/unstable
+# (common with robotics data collection).
+#
+# Dataset 1 has 30 episodes: 0..29
+# Last 10 episodes are 20..29.
+
+"/home/inkyu/workspace/dataset/sandi/inkyu-record02-30eps":
+  include_ranges:
+    - [20, 30]   # last 10 episodes
+
+"/home/inkyu/workspace/dataset/sandi/inkyu-record03-50eps": {}

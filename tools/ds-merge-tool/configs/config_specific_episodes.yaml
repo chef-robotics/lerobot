@@ -1,0 +1,19 @@
+# ==================================================
+# SELECTIVE MERGE USING EXPLICIT EPISODE INDEX LIST
+# ==================================================
+# Only include explicitly named episode indices from dataset 1.
+#
+# Useful for:
+#  - Manually selected "good" episodes
+#  - Debugging individual edge cases
+#  - Creating a minimal dataset for fast iteration
+
+"/home/inkyu/workspace/dataset/sandi/inkyu-record02-30eps":
+  include:
+    - 0
+    - 3
+    - 5
+    - 6
+    - 22  # pick only these episodes
+
+"/home/inkyu/workspace/dataset/sandi/inkyu-record03-50eps": {}

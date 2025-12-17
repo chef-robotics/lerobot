@@ -1,0 +1,14 @@
+# =============================================================
+# REMOVE FIRST 150 EPISODES FROM A LARGE DATASET (E.G., 350 EPS)
+# =============================================================
+# Useful in real-world datasets where:
+#   - early episodes contain startup noise
+#   - data collection procedure stabilized later
+#
+# This keeps only episodes 150..end.
+
+"/home/inkyu/workspace/dataset/sandi/inkyu-record01-350eps":
+  exclude_ranges:
+    - [0, 150]   # drop first 150
+
+"/home/inkyu/workspace/dataset/sandi/inkyu-record03-50eps": {}

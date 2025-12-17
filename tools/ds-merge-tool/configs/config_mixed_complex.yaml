@@ -1,0 +1,32 @@
+# ======================================================
+# COMPLEX MULTI-DATASET MERGE FOR REAL USE CASES
+# ======================================================
+# Dataset 1:
+#   - Keep 0..49
+#   - But explicitly drop 10..19 (bad range inside)
+#
+# Dataset 2:
+#   - Keep specific good episodes only
+#
+# Dataset 3:
+#   - Keep everything
+#
+# This config mimics realistic data-cleanup workflows
+# where datasets are partially usable, noisy, or have
+# complicated quality profiles.
+
+"/home/inkyu/workspace/dataset/sandi/inkyu-record02-30eps":
+  include_ranges:
+    - [0, 50]      # start with 0..49
+  exclude_ranges:
+    - [10, 20]     # drop 10..19 inside range
+
+"/home/inkyu/workspace/dataset/sandi/inkyu-record03-50eps":
+  include:
+    - 0
+    - 10
+    - 11
+    - 25
+    - 30
+
+"/home/inkyu/workspace/dataset/sandi/inkyu-record04-100eps": {}

@@ -1,0 +1,14 @@
+# ====================================================
+# DROP A BAD RANGE OF EPISODES (REMOVE EPISODES 10–19)
+# ====================================================
+# Use exclude_ranges when certain continuous spans of episodes
+# are corrupted, mislabeled, or undesirable.
+#
+# Here we drop episodes 10,11,...,19 from the first dataset only.
+# All other episodes from both datasets are preserved.
+
+"/home/inkyu/workspace/dataset/sandi/inkyu-record02-30eps":
+  exclude_ranges:
+    - [10, 20]   # remove 10..19
+
+"/home/inkyu/workspace/dataset/sandi/inkyu-record03-50eps": {}

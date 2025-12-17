@@ -1,0 +1,12 @@
+# ====================================================
+# DROP A BAD EPISODE
+# ====================================================
+# Use exclude
+# are corrupted, mislabeled, or undesirable.
+#
+# Here we drop episodes 14 from the first dataset.
+# All other episodes are preserved.
+
+"/home/inkyu/workspace/dataset/sandi/test-scooping-merged":
+  exclude:
+    - 14

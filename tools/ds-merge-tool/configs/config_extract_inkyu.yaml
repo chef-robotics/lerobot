@@ -1,0 +1,30 @@
+"/home/inkyu/workspace/dataset/sandi/lettuce-sandwich":
+  include_ranges:
+    - [169, 273]
+  exclude:
+    - 199
+    - 251
+    - 252
+  
+# "/home/inkyu/workspace/dataset/sandi/inkyu-record03-50eps":
+#   exclude:
+#     - 40
+
+# Meaning:
+# First dataset:
+#   keep episodes 169–272
+#   remove 199, 251, 252
+
+# Second dataset:
+#   keep ALL episodes
+
+# Third dataset:
+#   keep ALL episodes
+
+# command to run:
+# python merge_datasets.py \
+#   --input /home/inkyu/workspace/dataset/sandi/lettuce-sandwich \
+#   --input /home/inkyu/workspace/dataset/sandi/inkyu-record02-30eps \
+#   --input /home/inkyu/workspace/dataset/sandi/inkyu-record03-50eps \
+#   --output /home/inkyu/workspace/dataset/sandi/merged-273plus30plus50 \
+#   --config /home/inkyu/workspace/ds-merge-tool/configs/config.yaml

@@ -1,0 +1,16 @@
+# ======================================================
+# MERGE MULTIPLE NON-CONTIGUOUS EPISODE RANGES
+# ======================================================
+# Useful when episodes come in "blocks" of good/bad segments.
+#
+# Here we include:
+#   - Episodes 0..4   (first block)
+#   - Episodes 10..14 (second block)
+# All episodes from the second dataset are kept.
+
+"/home/inkyu/workspace/dataset/sandi/inkyu-record02-30eps":
+  include_ranges:
+    - [0, 5]     # include 0..4
+    - [10, 15]   # include 10..14
+
+"/home/inkyu/workspace/dataset/sandi/inkyu-record03-50eps": {}

@@ -1,0 +1,26 @@
+# ====================================================
+# DROP A BAD EPISODE
+# ====================================================
+# Use exclude
+# are corrupted, mislabeled, or undesirable.
+#
+# Here we drop episodes 14 from the first dataset.
+# All other episodes are preserved.
+
+"/media/inkyu/SSD_2TB_Black/sandi/scooping-simple/":
+  exclude:
+    - 58
+    - 59
+    - 101
+    - 102
+    - 103
+    - 104
+    - 105
+    - 106
+    - 107
+    - 108
+    - 109
+    - 111
+    - 179
+    - 180
+    - 181

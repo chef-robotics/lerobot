@@ -1,0 +1,23 @@
+"/home/inkyu/workspace/dataset/sandi/test-scooping": {}
+"/home/inkyu/workspace/dataset/sandi/test-scooping2": {}
+"/home/inkyu/workspace/dataset/sandi/test-scooping3": {}
+"/home/inkyu/workspace/dataset/sandi/test-scooping4": {}
+"/home/inkyu/workspace/dataset/sandi/test-scooping5": {}
+
+# Meaning:
+# First dataset:
+#   keep episodes 169–272
+#   remove 199, 251, 252
+
+# Second dataset:
+#   keep ALL episodes
+
+# Third dataset:
+#   keep ALL episodes
+
+# command to run:
+# python merge_datasets.py \
+#   --input /home/inkyu/workspace/dataset/sandi/inkyu-record02-30eps \
+#   --input /home/inkyu/workspace/dataset/sandi/inkyu-record03-50eps \
+#   --output /home/inkyu/workspace/dataset/sandi/merged-80eps \
+#   --config /home/inkyu/workspace/ds-merge-tool/configs/config_two_merge.yaml

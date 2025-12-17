@@ -1,0 +1,6 @@
+# If dataset A has 30 episodes and dataset B has 50 episodes, you will get:
+#   0..79     (80 total episodes)
+#
+# No trimming, no exclusion.
+"/home/inkyu/workspace/dataset/sandi/inkyu-record02-30eps": {}
+"/home/inkyu/workspace/dataset/sandi/inkyu-record03-50eps": {}

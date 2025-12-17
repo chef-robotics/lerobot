@@ -1,0 +1,12 @@
+# ============================================
+# SELECTIVE MERGE: FIRST 15 EPISODES OF DATASET 1
+# ============================================
+# - Keep episodes 0 through 14 from the FIRST dataset.
+# - Keep ALL episodes from the SECOND dataset.
+#
+
+"/home/inkyu/workspace/dataset/sandi/inkyu-record02-30eps":
+  include_ranges:
+    - [0, 15]   # include episodes 0..14 (15 episodes total)
+
+"/home/inkyu/workspace/dataset/sandi/inkyu-record03-50eps": {}  # keep all

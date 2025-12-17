@@ -1,0 +1,19 @@
+# ===========================================================
+# MERGE 3 DATASETS WITH DIFFERENT SELECTION RULES FOR EACH
+# ===========================================================
+# - Dataset 1: keep first 15 episodes
+# - Dataset 2: keep episodes 10..29
+# - Dataset 3: keep everything
+#
+# Use this when datasets have different quality regions
+# or if they were collected under different policies.
+
+"/home/inkyu/workspace/dataset/sandi/inkyu-record02-30eps":
+  include_ranges:
+    - [0, 15]
+
+"/home/inkyu/workspace/dataset/sandi/inkyu-record03-50eps":
+  include_ranges:
+    - [10, 30]
+
+"/home/inkyu/workspace/dataset/sandi/inkyu-record04-100eps": {}

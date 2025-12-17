@@ -1,4 +1,4 @@
-Chatgpt-generated
+This readme is AI-generated with minor editing.
 
 # 📦 Dataset Merge Utility
 

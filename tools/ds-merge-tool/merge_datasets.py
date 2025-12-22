@@ -2,7 +2,7 @@ import argparse
 import json
 import shutil
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Set
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -66,6 +66,7 @@ def copy_single_episode_with_reindex(
     old_idx: int,
     new_idx: int,
     global_frame_offset: int,
+    new_task_index: Optional[int] = None,
 ) -> int:
     """
     Copy ONE episode's parquet + all camera videos from src_root to dst_root,
@@ -73,6 +74,7 @@ def copy_single_episode_with_reindex(
       - episode_index == new_idx for all rows
       - frame_index == 0..(len-1) within that episode
       - index is global, starting at global_frame_offset
+      - task_index is updated to new_task_index (if provided)
 
     Returns:
         episode_length (number of rows) so the caller can update global_frame_offset.
@@ -115,6 +117,10 @@ def copy_single_episode_with_reindex(
         elif col_name == "index":
             # Global index across entire merged dataset
             arr = pa.array(range(global_frame_offset, global_frame_offset + num_rows), type=field_type)
+            column_data[col_name] = arr
+        elif col_name == "task_index" and new_task_index is not None:
+             # Remap task index
+            arr = pa.array([new_task_index] * num_rows, type=field_type)
             column_data[col_name] = arr
         else:
             # Keep original data
@@ -329,49 +335,25 @@ def parse_args():
     return parser.parse_args()
 
 
-def rebuild_tasks_from_episodes(
-    episodes_path: Path,
-    tasks_out_path: Path,
-    tasks_field: str = "tasks",
-):
-    """
-    Build tasks.jsonl from merged episodes.jsonl.
-
-    - episodes.jsonl is expected to have a field `tasks`, which is
-      a list of task strings for that episode.
-    - We deduplicate all task strings across episodes.
-    - We assign new contiguous task_index values: 0..N-1.
-    """
+def load_tasks_from_episodes(episodes_path: Path) -> Dict[int, str]:
+    """Load episode_index -> task_string map from episodes.jsonl"""
+    ep_tasks = {}
     if not episodes_path.exists():
-        print(f"[WARN] episodes.jsonl not found at {episodes_path}, skipping tasks.jsonl rebuild.")
-        return
-
-    task_to_index: Dict[str, int] = {}
-    next_idx = 0
-
+        return ep_tasks
+    
     with episodes_path.open("r") as f:
         for line in f:
             line = line.strip()
-            if not line:
+            if not line: 
                 continue
             obj = json.loads(line)
-
-            tasks = obj.get(tasks_field, [])
+            # Assuming single task or taking the first one
+            tasks = obj.get("tasks", [])
             if isinstance(tasks, str):
                 tasks = [tasks]
-
-            for t in tasks:
-                if t not in task_to_index:
-                    task_to_index[t] = next_idx
-                    next_idx += 1
-
-    tasks_out_path.parent.mkdir(parents=True, exist_ok=True)
-    with tasks_out_path.open("w") as f_out:
-        for task, idx in task_to_index.items():
-            rec = {"task_index": idx, "task": task}
-            f_out.write(json.dumps(rec) + "\n")
-
-    print(f"Rebuilt tasks.jsonl with {len(task_to_index)} unique task(s) at {tasks_out_path}")
+            if tasks:
+                ep_tasks[obj["episode_index"]] = tasks[0]
+    return ep_tasks
 
 
 def main():
@@ -412,18 +394,22 @@ def main():
         if p.exists():
             p.unlink()
 
-    # --- Process each input dataset ---
-    for src_root in tqdm(input_roots, total=len(input_roots), desc="Datasets"):
+    # --- Pre-scan to build global task map ---
+    print("\nPre-scanning tasks to build global registry...")
+    unique_tasks_order = []
+    unique_tasks_set = set()
+    
+    # Store selected episodes for the second pass
+    # Structure: [ (src_root, [list of selected old_indices]) ]
+    datasets_plan = [] 
+
+    for src_root in input_roots:
         src_root = src_root.resolve()
-        print(f"\nProcessing {src_root}")
-
         data_chunk_dir = src_root / "data" / "chunk-000"
+        
+        # 1. Determine selected episodes
         ep_indices = list_episode_indices(data_chunk_dir)
-
-        # Apply per-dataset selection (inclusion / exclusion)
         cfg = DATASET_SELECTION.get(str(src_root), {})
-        print(f"[DEBUG] Selection cfg for {src_root}: {cfg}")
-        ep_indices_before = list(ep_indices)
         ep_indices = apply_selection(
             ep_indices,
             include=cfg.get("include"),
@@ -431,20 +417,50 @@ def main():
             exclude=cfg.get("exclude"),
             exclude_ranges=cfg.get("exclude_ranges"),
         )
+        datasets_plan.append((src_root, ep_indices))
+        
+        if not ep_indices:
+            continue
+            
+        # 2. Load episode tasks
+        ep_tasks_map = load_tasks_from_episodes(src_root / "meta" / "episodes.jsonl")
+        
+        # 3. Collect unique tasks in order of appearance
+        for ep_idx in ep_indices:
+            t_str = ep_tasks_map.get(ep_idx)
+            if t_str and t_str not in unique_tasks_set:
+                unique_tasks_set.add(t_str)
+                unique_tasks_order.append(t_str)
 
-        print(
-            f"[DEBUG] {src_root.name}: {len(ep_indices_before)} episodes before selection,"
-            f" {len(ep_indices)} after selection; first few: {ep_indices[:10]}"
-        )
+    # Build task string -> new index map
+    task_str_to_id = {t: i for i, t in enumerate(unique_tasks_order)}
+    print(f"Found {len(task_str_to_id)} unique tasks.")
 
+    # Write merged tasks.jsonl IMMEDIATELY
+    merged_tasks_jsonl.parent.mkdir(parents=True, exist_ok=True)
+    with merged_tasks_jsonl.open("w") as f:
+        for t_str, t_id in task_str_to_id.items():
+            f.write(json.dumps({"task_index": t_id, "task": t_str}) + "\n")
+
+    # --- Process each input dataset (Second Pass) ---
+    for src_root, ep_indices in datasets_plan:
+        print(f"\nProcessing {src_root}")
+        
         if not ep_indices:
             print(f"  No episodes selected for {src_root}, skipping.")
             continue
 
+        print(
+            f"[DEBUG] {src_root.name}: processing {len(ep_indices)} selected episodes"
+        )
+        
+        # Load tasks map for this dataset again to look up during copy
+        ep_tasks_map = load_tasks_from_episodes(src_root / "meta" / "episodes.jsonl")
+
         # Mapping: old local episode index -> new global episode index
         index_map: Dict[int, int] = {}
 
-        # Copy & reindex each episode in order with per-dataset progress
+        # Copy & reindex each episode
         for old_idx in tqdm(
             ep_indices,
             total=len(ep_indices),
@@ -453,6 +469,10 @@ def main():
         ):
             new_idx = global_next_episode_idx
             index_map[old_idx] = new_idx
+            
+            # Determine new task index
+            t_str = ep_tasks_map.get(old_idx)
+            new_task_idx = task_str_to_id.get(t_str) if t_str else 0 # Default to 0 if missing?
 
             # This updates the parquet columns and copies videos
             episode_length = copy_single_episode_with_reindex(
@@ -461,6 +481,7 @@ def main():
                 old_idx=old_idx,
                 new_idx=new_idx,
                 global_frame_offset=global_next_frame_index,
+                new_task_index=new_task_idx,
             )
 
             global_next_frame_index += episode_length
@@ -483,12 +504,6 @@ def main():
 
         # Keep info.json for later merge
         info_paths.append(src_meta / "info.json")
-
-    # Rebuild tasks.jsonl from merged episodes.jsonl
-    rebuild_tasks_from_episodes(
-        episodes_path=merged_episodes_jsonl,
-        tasks_out_path=merged_tasks_jsonl,
-    )
 
     # Use the first info.json as template for static fields
     if not info_paths:

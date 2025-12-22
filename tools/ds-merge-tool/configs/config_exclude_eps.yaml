@@ -7,6 +7,7 @@
 # Here we drop episodes 14 from the first dataset.
 # All other episodes are preserved.
 
-"/home/inkyu/workspace/dataset/sandi/test-scooping-merged":
+"/home/inkyu/workspace/dataset/sandi/hi-test/":
   exclude:
-    - 14
+    - 10
+    - 11

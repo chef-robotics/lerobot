@@ -243,10 +243,30 @@ def record(
 ) -> LeRobotDataset:
     # TODO(rcadene): Add option to record logs
 
+    def _resolve_dataset_root(repo_id: str, root: str | Path | None) -> str | None:
+        """Resolve `root` to the actual dataset directory.
+
+        `LeRobotDataset.create(..., root=...)` treats `root` as a parent directory and creates the dataset at
+        `<root>/<repo_id>`. For resume, users often pass the same parent directory, so we auto-resolve it here.
+        """
+        if root is None:
+            return None
+        root_path = Path(root)
+        # If root already points at a dataset directory, keep it.
+        if (root_path / "meta" / "info.json").is_file():
+            return str(root_path)
+        # Otherwise, try interpreting root as a parent directory.
+        candidate = root_path / repo_id
+        if (candidate / "meta" / "info.json").is_file():
+            return str(candidate)
+        # Fall back to original; LeRobotDataset will error with a clear path if it's wrong.
+        return str(root_path)
+
     if cfg.resume:
+        resolved_root = _resolve_dataset_root(cfg.repo_id, cfg.root)
         dataset = LeRobotDataset(
             cfg.repo_id,
-            root=cfg.root,
+            root=resolved_root,
         )
         if len(robot.cameras) > 0:
             dataset.start_image_writer(
@@ -368,7 +388,13 @@ def replay(
     # TODO(rcadene, aliberts): refactor with control_loop, once `dataset` is an instance of LeRobotDataset
     # TODO(rcadene): Add option to record logs
 
-    dataset = LeRobotDataset(cfg.repo_id, root=cfg.root, episodes=[cfg.episode])
+    # Accept either a dataset directory (containing meta/info.json) or a parent directory (containing <repo_id>/...).
+    root_path = Path(cfg.root) if cfg.root is not None else None
+    if root_path is not None and not (root_path / "meta" / "info.json").is_file():
+        candidate = root_path / cfg.repo_id
+        if (candidate / "meta" / "info.json").is_file():
+            root_path = candidate
+    dataset = LeRobotDataset(cfg.repo_id, root=str(root_path) if root_path is not None else None, episodes=[cfg.episode])
     actions = dataset.hf_dataset.select_columns("action")
 
     # Disable leader arms as they are not used during replay

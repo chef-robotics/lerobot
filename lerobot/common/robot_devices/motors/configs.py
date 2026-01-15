@@ -48,3 +48,6 @@ class TrossenArmDriverConfig(MotorsBusConfig):
     model: str
     mock: bool = False
     min_time_to_move_multiplier: float = 3.0
+    # Gripper clip opening (meters),
+    # clips joint_6 position at leader read level.
+    gripper_clip_opening: float | None = None

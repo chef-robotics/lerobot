@@ -641,6 +641,9 @@ class TrossenAIStationaryRobotConfig(ManipulatorRobotConfig):
     # A recommended starting value is 3.0.
     min_time_to_move_multiplier: float = 3.0
 
+    # Gripper clip opening passed through to arm driver
+    gripper_clip_opening: float | None = None
+
     # Set this according to the camera interface you want to use.
     # "intel_realsense" is the default and recommended option.
     # "opencv" is a fallback option that uses OpenCV to access the cameras.
@@ -661,12 +664,14 @@ class TrossenAIStationaryRobotConfig(ManipulatorRobotConfig):
                 ip="192.168.1.3",
                 model="V0_LEADER",
                 min_time_to_move_multiplier=self.min_time_to_move_multiplier,
+                gripper_clip_opening=self.gripper_clip_opening,
             ),
             "right": TrossenArmDriverConfig(
                 # wxai
                 ip="192.168.1.2",
                 model="V0_LEADER",
                 min_time_to_move_multiplier=self.min_time_to_move_multiplier,
+                gripper_clip_opening=self.gripper_clip_opening,
             ),
         }
 
@@ -775,6 +780,9 @@ class TrossenAISoloRobotConfig(ManipulatorRobotConfig):
     # A recommended starting value is 3.0.
     min_time_to_move_multiplier: float = 3.0
 
+    # Gripper clip opening passed through to arm driver
+    gripper_clip_opening: float | None = None
+
     # Set this according to the camera interface you want to use.
     # "intel_realsense" is the default and recommended option.
     # "opencv" is a fallback option that uses OpenCV to access the cameras.
@@ -795,6 +803,7 @@ class TrossenAISoloRobotConfig(ManipulatorRobotConfig):
                 ip="192.168.1.2",
                 model="V0_LEADER",
                 min_time_to_move_multiplier=self.min_time_to_move_multiplier,
+                gripper_clip_opening=self.gripper_clip_opening,
             ),
         }
 
@@ -873,6 +882,9 @@ class TrossenAIMobileRobotConfig(RobotConfig):
     # A recommended starting value is 3.0.
     min_time_to_move_multiplier: float = 3.0
 
+    # Gripper clip opening passed through to arm driver
+    gripper_clip_opening: float | None = None
+
     # Set this according to the camera interface you want to use.
     # "intel_realsense" is the default and recommended option.
     # "opencv" is a fallback option that uses OpenCV to access the cameras.
@@ -895,12 +907,14 @@ class TrossenAIMobileRobotConfig(RobotConfig):
                 ip="192.168.1.3",
                 model="V0_LEADER",
                 min_time_to_move_multiplier=self.min_time_to_move_multiplier,
+                gripper_clip_opening=self.gripper_clip_opening,
             ),
             "right": TrossenArmDriverConfig(
                 # wxai
                 ip="192.168.1.2",
                 model="V0_LEADER",
                 min_time_to_move_multiplier=self.min_time_to_move_multiplier,
+                gripper_clip_opening=self.gripper_clip_opening,
             ),
         }
 

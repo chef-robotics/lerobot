@@ -69,6 +69,7 @@ class TrossenArmDriver:
         self.model = config.model
         self.mock = config.mock
         self.min_time_to_move_multiplier = config.min_time_to_move_multiplier
+        self.gripper_clip_opening = config.gripper_clip_opening
         self.driver = None
         self.calibration = None
         self.is_connected = False
@@ -184,6 +185,9 @@ class TrossenArmDriver:
         if data_name == "Present_Position":
             # Get the positions of the motors
             values = self.driver.get_all_positions()
+            # Apply gripper clipping if configured
+            if self.gripper_clip_opening is not None and "V0_LEADER" in self.model:
+                values[6] = min(values[6], self.gripper_clip_opening)
         elif data_name == "External_Efforts":
             values = self.driver.get_all_external_efforts()
         else:

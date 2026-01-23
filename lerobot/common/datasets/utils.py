@@ -513,6 +513,12 @@ def check_timestamps_sync(
     mask = np.ones(len(diffs), dtype=bool)
     ignored_diffs = episode_data_index["to"][:-1] - 1  # indices at the end of each episode
     mask[ignored_diffs] = False
+
+    # Also ignore differences when episode_index changes (e.g. metadata is out of sync with data)
+    if len(episode_indices) > 1:
+        episode_changes = episode_indices[1:] != episode_indices[:-1]
+        mask[episode_changes] = False
+
     filtered_within_tolerance = within_tolerance[mask]
 
     # Check if all remaining diffs are within tolerance

@@ -577,8 +577,11 @@ class LeRobotDataset(torch.utils.data.Dataset):
             self.episode_index_to_position = None
 
         # Check timestamps
-        timestamps = torch.stack(self.hf_dataset["timestamp"]).numpy()
-        episode_indices = torch.stack(self.hf_dataset["episode_index"]).numpy()
+        # Handle both list of tensors and raw values
+        ts_data = self.hf_dataset["timestamp"]
+        ep_data = self.hf_dataset["episode_index"]
+        timestamps = (torch.stack(ts_data) if isinstance(ts_data, list) else torch.tensor(ts_data)).numpy()
+        episode_indices = (torch.stack(ep_data) if isinstance(ep_data, list) else torch.tensor(ep_data)).numpy()
         ep_data_index_np = {k: t.numpy() for k, t in self.episode_data_index.items()}
         check_timestamps_sync(timestamps, episode_indices, ep_data_index_np, self.fps, self.tolerance_s)
 

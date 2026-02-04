@@ -176,6 +176,8 @@ def warmup_record(
     warmup_time_s,
     display_cameras,
     fps,
+    record_bottom_camera: bool = True,
+    bottom_camera_name: str = "cam_low",
 ):
     control_loop(
         robot=robot,
@@ -184,6 +186,8 @@ def warmup_record(
         events=events,
         fps=fps,
         teleoperate=enable_teleoperation,
+        record_bottom_camera=record_bottom_camera,
+        bottom_camera_name=bottom_camera_name,
     )
 
 
@@ -196,6 +200,8 @@ def record_episode(
     policy,
     fps,
     single_task,
+    record_bottom_camera: bool = True,
+    bottom_camera_name: str = "cam_low",
 ):
     control_loop(
         robot=robot,
@@ -207,6 +213,8 @@ def record_episode(
         fps=fps,
         teleoperate=policy is None,
         single_task=single_task,
+        record_bottom_camera=record_bottom_camera,
+        bottom_camera_name=bottom_camera_name,
     )
 
 
@@ -221,6 +229,8 @@ def control_loop(
     policy: PreTrainedPolicy = None,
     fps: int | None = None,
     single_task: str | None = None,
+    record_bottom_camera: bool = True,
+    bottom_camera_name: str = "cam_low",
 ):
     # TODO(rcadene): Add option to record logs
     if not robot.is_connected:
@@ -261,11 +271,16 @@ def control_loop(
                 action = {"action": action}
 
         if dataset is not None:
-            frame = {**observation, **action, "task": single_task}
+            # Only include keys that the dataset expects (e.g. when record_bottom_camera=False).
+            frame = {k: v for k, v in {**observation, **action}.items() if k in dataset.features}
+            frame["task"] = single_task
             dataset.add_frame(frame)
 
         if display_cameras and not is_headless():
             image_keys = [key for key in observation if "image" in key]
+            if not record_bottom_camera:
+                bottom_key = f"observation.images.{bottom_camera_name}"
+                image_keys = [k for k in image_keys if k != bottom_key]
             for key in image_keys:
                 cv2.imshow(key, cv2.cvtColor(observation[key].numpy(), cv2.COLOR_RGB2BGR))
             cv2.waitKey(1)
@@ -332,22 +347,53 @@ def sanity_check_dataset_name(repo_id, policy_cfg):
         )
 
 
+def _camera_feature_keys(features: dict) -> set[str]:
+    return {k for k in features if k.startswith("observation.images.")}
+
+
 def sanity_check_dataset_robot_compatibility(
-    dataset: LeRobotDataset, robot: Robot, fps: int, use_videos: bool
+    dataset: LeRobotDataset,
+    robot: Robot,
+    fps: int,
+    use_videos: bool,
+    record_cfg=None,
 ) -> None:
-    fields = [
-        ("robot_type", dataset.meta.robot_type, robot.robot_type),
-        ("fps", dataset.fps, fps),
-        ("features", dataset.features, get_features_from_robot(robot, use_videos)),
-    ]
+    robot_features = get_features_from_robot(robot, use_videos)
+    dataset_cam_keys = _camera_feature_keys(dataset.features)
+    robot_cam_keys = _camera_feature_keys(robot_features)
+    missing_on_robot = dataset_cam_keys - robot_cam_keys
 
-    mismatches = []
-    for field, dataset_value, present_value in fields:
-        diff = DeepDiff(dataset_value, present_value, exclude_regex_paths=[r".*\['info'\]$"])
-        if diff:
-            mismatches.append(f"{field}: expected {present_value}, got {dataset_value}")
-
-    if mismatches:
+    # Dataset expects cameras that the robot is not providing (e.g. only 3 cams connected).
+    if missing_on_robot:
+        missing_list = sorted(missing_on_robot)
+        camera_names = [k.replace("observation.images.", "") for k in missing_list]
         raise ValueError(
-            "Dataset metadata compatibility check failed with mismatches:\n" + "\n".join(mismatches)
+            "The dataset was recorded with more cameras than are currently connected. "
+            f"Missing camera(s): {camera_names}. "
+            "Either connect the missing camera(s) or record to a new dataset with "
+            "--control.record_bottom_camera=false (and use a new --control.repo_id or --control.root)."
         )
+
+    # Require dataset features to be a subset of robot features; compare each key (ignore 'info').
+    for key in dataset.features:
+        if key not in robot_features:
+            raise ValueError(
+                f"Dataset feature '{key}' is not provided by the robot. Compatibility check failed."
+            )
+        diff = DeepDiff(
+            dataset.features[key],
+            robot_features[key],
+            exclude_regex_paths=[r".*\['info'\]$"],
+        )
+        if diff:
+            raise ValueError(
+                f"Dataset metadata compatibility failed for feature '{key}': "
+                f"expected {robot_features[key]}, got {dataset.features[key]}."
+            )
+
+    if dataset.meta.robot_type != robot.robot_type:
+        raise ValueError(
+            f"robot_type mismatch: dataset has {dataset.meta.robot_type}, robot has {robot.robot_type}"
+        )
+    if dataset.fps != fps:
+        raise ValueError(f"fps mismatch: dataset has {dataset.fps}, requested {fps}")

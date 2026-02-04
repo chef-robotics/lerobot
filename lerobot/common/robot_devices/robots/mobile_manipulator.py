@@ -235,7 +235,7 @@ class MobileManipulator:
         except AttributeError:
             pass
 
-    def connect(self):
+    def connect(self, optional_camera_names: list[str] | None = None):
         if not self.leader_arms:
             raise ValueError("MobileManipulator has no leader arm to connect.")
         for name in self.leader_arms:

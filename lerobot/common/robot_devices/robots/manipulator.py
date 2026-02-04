@@ -244,7 +244,7 @@ class ManipulatorRobot:
             for arms in self.follower_arms:
                 self.follower_arms[arms].write("Torque_Enable", 1)
 
-    def connect(self):
+    def connect(self, optional_camera_names: list[str] | None = None):
         if self.is_connected:
             raise RobotDeviceAlreadyConnectedError(
                 "ManipulatorRobot is already connected. Do not run `robot.connect()` twice."
@@ -310,9 +310,21 @@ class ManipulatorRobot:
         for name in self.leader_arms:
             self.leader_arms[name].read("Present_Position")
 
-        # Connect the cameras
-        for name in self.cameras:
-            self.cameras[name].connect()
+        # Connect the cameras. Optional cameras (e.g. bottom) are skipped if they fail to connect.
+        optional = set(optional_camera_names or ())
+        for name in list(self.cameras.keys()):
+            try:
+                self.cameras[name].connect()
+            except Exception as e:
+                if name in optional:
+                    msg = (
+                        "Camera %s could not be connected and will be skipped for recording (%s). "
+                        "Recording will continue with the other cameras."
+                    ) % (name, str(e))
+                    logging.warning(msg)
+                    del self.cameras[name]
+                else:
+                    raise
 
         self.is_connected = True
 

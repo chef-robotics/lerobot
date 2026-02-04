@@ -83,6 +83,12 @@ class RecordControlConfig(ControlConfig):
     num_image_writer_threads_per_camera: int = 4
     # Display all cameras on screen
     display_cameras: bool = True
+    # Include the bottom (low) camera in recorded data. When False, the bottom camera is not
+    # recorded regardless of whether it is connected. Useful when the bottom camera is optional.
+    record_bottom_camera: bool = False
+    # Camera key used as the bottom camera (e.g. "cam_low" for trossen_ai_stationary).
+    # Only used when record_bottom_camera is False.
+    bottom_camera_name: str = "cam_low"
     # Use vocal synthesis to read events.
     play_sounds: bool = True
     # Resume recording on an existing dataset.

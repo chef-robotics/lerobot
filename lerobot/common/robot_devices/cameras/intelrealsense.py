@@ -23,7 +23,6 @@ import math
 import shutil
 import threading
 import time
-import traceback
 from collections import Counter
 from pathlib import Path
 from threading import Thread
@@ -314,9 +313,9 @@ class IntelRealSenseCamera:
         try:
             profile = self.camera.start(config)
             is_camera_open = True
-        except RuntimeError:
+        except RuntimeError as e:
             is_camera_open = False
-            traceback.print_exc()
+            logging.debug("IntelRealSense %s failed to start: %s", self.serial_number, e, exc_info=True)
 
         # If the camera doesn't work, display the camera indices corresponding to
         # valid cameras.

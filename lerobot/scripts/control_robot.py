@@ -289,10 +289,15 @@ def record(
             )
         sanity_check_dataset_robot_compatibility(dataset, robot, cfg.fps, cfg.video, cfg)
     else:
-        # Connect before creating the dataset so we know which cameras are available.
-        # Bottom camera is optional: if not connected, we record without it.
+        # Connect before creating the dataset. For new recording, treat all cameras as optional
+        # so we record with whatever connects (e.g. bottom unplugged or record_bottom_camera=false).
         if not robot.is_connected:
+            optional_camera_names = list(robot.cameras.keys())
             robot.connect(optional_camera_names=optional_camera_names)
+        if len(robot.cameras) == 0:
+            raise ValueError(
+                "No cameras could be connected. Connect at least one camera and run again."
+            )
         # Create empty dataset or load existing saved episodes
         sanity_check_dataset_name(cfg.repo_id, cfg.policy)
         features = get_features_from_robot(robot, cfg.video)

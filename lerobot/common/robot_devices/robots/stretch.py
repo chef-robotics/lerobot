@@ -49,7 +49,7 @@ class StretchRobot(StretchAPI):
         self.state_keys = None
         self.action_keys = None
 
-    def connect(self) -> None:
+    def connect(self, optional_camera_names: list[str] | None = None) -> None:
         self.is_connected = self.startup()
         if not self.is_connected:
             print("Another process is already using Stretch. Try running 'stretch_free_robot_process.py'")

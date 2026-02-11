@@ -141,6 +141,7 @@ from pprint import pformat
 
 # from safetensors.torch import load_file, save_file
 from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
+from lerobot.common.datasets.utils import get_features_from_robot
 from lerobot.common.policies.factory import make_policy
 from lerobot.common.robot_devices.control_configs import (
     CalibrateControlConfig,
@@ -243,29 +244,93 @@ def record(
 ) -> LeRobotDataset:
     # TODO(rcadene): Add option to record logs
 
+    def _resolve_dataset_root(repo_id: str, root: str | Path | None) -> str | None:
+        """Resolve `root` to the actual dataset directory.
+
+        `LeRobotDataset.create(..., root=...)` treats `root` as a parent directory and creates the dataset at
+        `<root>/<repo_id>`. For resume, users often pass the same parent directory, so we auto-resolve it here.
+        """
+        if root is None:
+            return None
+        root_path = Path(root)
+        # If root already points at a dataset directory, keep it.
+        if (root_path / "meta" / "info.json").is_file():
+            return str(root_path)
+        # Otherwise, try interpreting root as a parent directory.
+        candidate = root_path / repo_id
+        if (candidate / "meta" / "info.json").is_file():
+            return str(candidate)
+        # Fall back to original; LeRobotDataset will error with a clear path if it's wrong.
+        return str(root_path)
+
+    optional_camera_names = [cfg.bottom_camera_name]
+
     if cfg.resume:
         dataset = LeRobotDataset(
             cfg.repo_id,
             root=cfg.root,
         )
-        if len(robot.cameras) > 0:
+        # When resuming, treat any camera not in the dataset as optional so we don't
+        # require connecting it (e.g. cam_low for a 3-cam dataset).
+        dataset_cam_keys = {k for k in dataset.features if k.startswith("observation.images.")}
+        optional_camera_names = list(
+            {cfg.bottom_camera_name}
+            | {
+                name
+                for name in robot.cameras
+                if f"observation.images.{name}" not in dataset_cam_keys
+            }
+        )
+        num_recording_cameras = len(dataset_cam_keys)
+        if num_recording_cameras > 0:
             dataset.start_image_writer(
                 num_processes=cfg.num_image_writer_processes,
-                num_threads=cfg.num_image_writer_threads_per_camera * len(robot.cameras),
+                num_threads=cfg.num_image_writer_threads_per_camera * num_recording_cameras,
             )
-        sanity_check_dataset_robot_compatibility(dataset, robot, cfg.fps, cfg.video)
+        sanity_check_dataset_robot_compatibility(dataset, robot, cfg.fps, cfg.video, cfg)
     else:
+        # Connect before creating the dataset. For new recording, treat all cameras as optional
+        # so we record with whatever connects (e.g. bottom unplugged or record_bottom_camera=false).
+        if not robot.is_connected:
+            optional_camera_names = list(robot.cameras.keys())
+            robot.connect(optional_camera_names=optional_camera_names)
+        if len(robot.cameras) == 0:
+            raise ValueError(
+                "No cameras could be connected. Connect at least one camera and run again."
+            )
         # Create empty dataset or load existing saved episodes
         sanity_check_dataset_name(cfg.repo_id, cfg.policy)
-        dataset = LeRobotDataset.create(
-            cfg.repo_id,
-            cfg.fps,
-            root=cfg.root,
-            robot=robot,
-            use_videos=cfg.video,
-            image_writer_processes=cfg.num_image_writer_processes,
-            image_writer_threads=cfg.num_image_writer_threads_per_camera * len(robot.cameras),
-        )
+        features = get_features_from_robot(robot, cfg.video)
+        if not cfg.record_bottom_camera:
+            bottom_key = f"observation.images.{cfg.bottom_camera_name}"
+            if bottom_key in features:
+                del features[bottom_key]
+        num_recording_cameras = len([k for k in features if k.startswith("observation.images.")])
+        if num_recording_cameras == 0 and len(robot.cameras) > 0:
+            num_recording_cameras = len(robot.cameras)
+        create_with_robot = cfg.record_bottom_camera or cfg.bottom_camera_name not in robot.cameras
+        if create_with_robot:
+            dataset = LeRobotDataset.create(
+                cfg.repo_id,
+                cfg.fps,
+                root=cfg.root,
+                robot=robot,
+                use_videos=cfg.video,
+                image_writer_processes=cfg.num_image_writer_processes,
+                image_writer_threads=cfg.num_image_writer_threads_per_camera * len(robot.cameras),
+            )
+        else:
+            dataset = LeRobotDataset.create(
+                cfg.repo_id,
+                cfg.fps,
+                root=cfg.root,
+                robot=None,
+                robot_type=robot.robot_type,
+                features=features,
+                use_videos=cfg.video,
+                image_writer_processes=cfg.num_image_writer_processes,
+                image_writer_threads=cfg.num_image_writer_threads_per_camera * num_recording_cameras,
+            )
 
     # Load pretrained policy
     policy = None if cfg.policy is None else make_policy(cfg.policy, ds_meta=dataset.meta)
@@ -276,7 +341,7 @@ def record(
         robot.leader_arms = []
 
     if not robot.is_connected:
-        robot.connect()
+        robot.connect(optional_camera_names=optional_camera_names)
 
     listener, events = init_keyboard_listener()
 
@@ -286,7 +351,16 @@ def record(
     # 3. place the cameras windows on screen
     enable_teleoperation = policy is None
     log_say("Warmup record", cfg.play_sounds)
-    warmup_record(robot, events, enable_teleoperation, cfg.warmup_time_s, cfg.display_cameras, cfg.fps)
+    warmup_record(
+        robot,
+        events,
+        enable_teleoperation,
+        cfg.warmup_time_s,
+        cfg.display_cameras,
+        cfg.fps,
+        record_bottom_camera=cfg.record_bottom_camera,
+        bottom_camera_name=cfg.bottom_camera_name,
+    )
 
     if has_method(robot, "teleop_safety_stop"):
         robot.teleop_safety_stop()
@@ -307,6 +381,8 @@ def record(
                 policy=policy,
                 fps=cfg.fps,
                 single_task=cfg.single_task,
+                record_bottom_camera=cfg.record_bottom_camera,
+                bottom_camera_name=cfg.bottom_camera_name,
             )
 
             # Execute a few seconds without recording to give time to manually reset the environment

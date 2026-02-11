@@ -103,7 +103,7 @@ class TrossenAIMobile:
         for arms in self.follower_arms:
             self.follower_arms[arms].write("Torque_Enable", 1)
 
-    def connect(self) -> None:
+    def connect(self, optional_camera_names: list[str] | None = None) -> None:
         if self.is_connected:
             raise RobotDeviceAlreadyConnectedError(
                 "TrossenAIMobile is already connected. Do not run `robot.connect()` twice."

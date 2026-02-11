@@ -109,6 +109,16 @@ python lerobot/scripts/control_robot.py \
   --control.num_image_writer_threads_per_camera=8
 ```
 
+**Note:** The `control_robot` script and the `--control.record_bottom_camera` / `--control.bottom_camera_name` options are provided by this repo (trossen-lerobot). Run the command from the trossen-lerobot directory (e.g. `cd third_party/trossen-lerobot && uv run python -m lerobot.scripts.control_robot ...`) or from an environment where `lerobot` is installed from this repo. If you use another lerobot install (e.g. from chef-openpi), those flags will not be available.
+
+### Optional: exclude bottom camera from recording
+
+To record without the bottom (low) camera, add:
+```bash
+  --control.record_bottom_camera=false
+```
+The default bottom camera key is `cam_low`; override with `--control.bottom_camera_name=your_camera_key` if needed. If the bottom camera is not connected but you leave recording enabled, it is skipped with a warning and recording continues with the other cameras.
+
 ## Visualize a dataset
 
 If you uploaded your dataset to the hub with `--control.push_to_hub=true`, you can [visualize your dataset online](https://huggingface.co/spaces/lerobot/visualize_dataset) by copy pasting your repo id given by:

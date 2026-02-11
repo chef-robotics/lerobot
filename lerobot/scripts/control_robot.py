@@ -138,6 +138,7 @@ import logging
 import time
 from dataclasses import asdict
 from pprint import pformat
+from pathlib import Path
 
 # from safetensors.torch import load_file, save_file
 from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
@@ -266,9 +267,10 @@ def record(
     optional_camera_names = [cfg.bottom_camera_name]
 
     if cfg.resume:
+        resolved_root = _resolve_dataset_root(cfg.repo_id, cfg.root)
         dataset = LeRobotDataset(
             cfg.repo_id,
-            root=cfg.root,
+            root=resolved_root,
         )
         # When resuming, treat any camera not in the dataset as optional so we don't
         # require connecting it (e.g. cam_low for a 3-cam dataset).
@@ -444,7 +446,13 @@ def replay(
     # TODO(rcadene, aliberts): refactor with control_loop, once `dataset` is an instance of LeRobotDataset
     # TODO(rcadene): Add option to record logs
 
-    dataset = LeRobotDataset(cfg.repo_id, root=cfg.root, episodes=[cfg.episode])
+    # Accept either a dataset directory (containing meta/info.json) or a parent directory (containing <repo_id>/...).
+    root_path = Path(cfg.root) if cfg.root is not None else None
+    if root_path is not None and not (root_path / "meta" / "info.json").is_file():
+        candidate = root_path / cfg.repo_id
+        if (candidate / "meta" / "info.json").is_file():
+            root_path = candidate
+    dataset = LeRobotDataset(cfg.repo_id, root=str(root_path) if root_path is not None else None, episodes=[cfg.episode])
     actions = dataset.hf_dataset.select_columns("action")
 
     # Disable leader arms as they are not used during replay

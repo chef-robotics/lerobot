@@ -87,7 +87,12 @@ def run_server(
     @app.route("/")
     def hommepage(dataset=dataset):
         if dataset:
-            dataset_namespace, dataset_name = dataset.repo_id.split("/")
+            parts = [p for p in dataset.repo_id.split("/") if p]
+            if len(parts) >= 2:
+                dataset_namespace, dataset_name = parts[-2], parts[-1]
+            else:
+                dataset_namespace, dataset_name = "local", parts[0]
+
             return redirect(
                 url_for(
                     "show_episode",

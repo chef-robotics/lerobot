@@ -730,12 +730,12 @@ class TrossenAIStationaryRobotConfig(ManipulatorRobotConfig):
                     width=640,
                     height=480,
                 ),
-                "cam_low": IntelRealSenseCameraConfig(
-                    serial_number=230322271134,
-                    fps=30,
-                    width=640,
-                    height=480,
-                ),
+                # "cam_low": IntelRealSenseCameraConfig(
+                #     serial_number=230322271134,
+                #     fps=30,
+                #     width=640,
+                #     height=480,
+                # ),
                 "cam_left_wrist": IntelRealSenseCameraConfig(
                     serial_number=230322270548,
                     fps=30,

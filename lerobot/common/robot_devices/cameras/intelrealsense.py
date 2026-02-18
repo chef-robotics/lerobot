@@ -436,10 +436,15 @@ class IntelRealSenseCamera:
 
     def read_loop(self):
         while not self.stop_event.is_set():
-            if self.use_depth:
-                self.color_image, self.depth_map = self.read()
-            else:
-                self.color_image = self.read()
+            try:
+                if self.use_depth:
+                    self.color_image, self.depth_map = self.read()
+                else:
+                    self.color_image = self.read()
+            except RuntimeError as e:
+                # Frame timeout - log and retry instead of crashing the thread
+                logging.warning(f"Camera {self.serial_number} frame timeout: {e}. Retrying...")
+                continue
 
     def async_read(self):
         """Access the latest color image"""

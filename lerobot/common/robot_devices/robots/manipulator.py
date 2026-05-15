@@ -165,6 +165,13 @@ class ManipulatorRobot:
         self.leader_arms = make_motors_buses_from_configs(self.config.leader_arms)
         self.follower_arms = make_motors_buses_from_configs(self.config.follower_arms)
         
+        # Find indices of grippers
+        self.gripper_idxs: dict[str, int] = {}
+        for name, bus in self.follower_arms.items():
+            names = list(bus.motor_names)
+            if "joint_6" in names:
+                self.gripper_idxs[name] = names.index("joint_6")
+                
         self.cameras = make_cameras_from_configs(self.config.cameras)
         self.force_feedback_gain = self.config.force_feedback_gain
         self.is_connected = False
@@ -491,11 +498,22 @@ class ManipulatorRobot:
 
         # Send goal position to the follower
         follower_goal_pos = {}
-        
         for name in self.follower_arms:
             before_fwrite_t = time.perf_counter()
             goal_pos = leader_pos[name]
             
+            if self.robot_type in ["trossen_ai_stationary", "trossen_ai_solo"]:
+                if name in self.gripper_idxs:
+                    gripper_idx = self.gripper_idxs[name]
+                    x_leader = goal_pos[gripper_idx]
+
+                    # follower = scale * leader + offset
+                    scale = getattr(self.config, "gripper_scale", 1.0)
+                    offset = getattr(self.config, "gripper_offset", 0.0)
+                    goal_pos[gripper_idx] = scale * x_leader + offset
+                    print("leader:", leader_pos[name]) #for tuning
+                    print("mapped goal:", goal_pos)
+                    
             # Cap goal position when too far away from present position.
             # Slower fps expected due to reading from the follower.
             if self.config.max_relative_target is not None:

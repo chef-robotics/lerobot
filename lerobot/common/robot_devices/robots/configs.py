@@ -656,6 +656,14 @@ class TrossenAIStationaryRobotConfig(ManipulatorRobotConfig):
     cameras: dict[str, CameraConfig] = field(init=False)  # Initialized later
 
     mock: bool = False
+    
+    # Simple per-gripper linear mapping:
+    # follower end-effector position = scale * leader_ee + offset (meters)
+    gripper_scale: float = 1.0 #no scaling by default
+    
+    # Offset applied when leader gripper is fully closed; 0.01 opens follower
+    # gripper ~2 cm in total (~1 cm per finger from center).
+    gripper_offset: float = 0
 
     def __post_init__(self):
         self.leader_arms = {
